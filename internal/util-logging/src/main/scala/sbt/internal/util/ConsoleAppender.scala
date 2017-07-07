@@ -30,16 +30,16 @@ object ConsoleLogger {
   def apply(out: PrintStream): ConsoleLogger = apply(ConsoleOut.printStreamOut(out))
   def apply(out: PrintWriter): ConsoleLogger = apply(ConsoleOut.printWriterOut(out))
   def apply(out: ConsoleOut = ConsoleOut.systemOut, ansiCodesSupported: Boolean = ConsoleAppender.formatEnabled,
-    useColor: Boolean = ConsoleAppender.formatEnabled, suppressedMessage: SuppressedTraceContext => Option[String] = ConsoleAppender.noSuppressedMessage): ConsoleLogger =
-    new ConsoleLogger(out, ansiCodesSupported, useColor, suppressedMessage)
+    useFormat: Boolean = ConsoleAppender.formatEnabled, suppressedMessage: SuppressedTraceContext => Option[String] = ConsoleAppender.noSuppressedMessage): ConsoleLogger =
+    new ConsoleLogger(out, ansiCodesSupported, useFormat, suppressedMessage)
 }
 
 /**
  * A logger that logs to the console.  On supported systems, the level labels are
  * colored.
  */
-class ConsoleLogger private[ConsoleLogger] (val out: ConsoleOut, override val ansiCodesSupported: Boolean, val useColor: Boolean, val suppressedMessage: SuppressedTraceContext => Option[String]) extends BasicLogger {
-  private[sbt] val appender = ConsoleAppender(generateName, out, ansiCodesSupported, useColor, suppressedMessage)
+class ConsoleLogger private[ConsoleLogger] (val out: ConsoleOut, override val ansiCodesSupported: Boolean, val useFormat: Boolean, val suppressedMessage: SuppressedTraceContext => Option[String]) extends BasicLogger {
+  private[sbt] val appender = ConsoleAppender(generateName, out, ansiCodesSupported, useFormat, suppressedMessage)
 
   override def control(event: ControlEvent.Value, message: => String): Unit =
     appender.control(event, message)
@@ -187,13 +187,13 @@ object ConsoleAppender {
   def apply(name: String, out: ConsoleOut, suppressedMessage: SuppressedTraceContext => Option[String]): ConsoleAppender =
     apply(name, out, formatEnabled, formatEnabled, suppressedMessage)
 
-  def apply(name: String, out: ConsoleOut, useColor: Boolean): ConsoleAppender =
-    apply(name, out, formatEnabled, useColor, noSuppressedMessage)
+  def apply(name: String, out: ConsoleOut, useFormat: Boolean): ConsoleAppender =
+    apply(name, out, formatEnabled, useFormat, noSuppressedMessage)
 
   def apply(name: String, out: ConsoleOut, ansiCodesSupported: Boolean,
-    useColor: Boolean, suppressedMessage: SuppressedTraceContext => Option[String]): ConsoleAppender =
+    useFormat: Boolean, suppressedMessage: SuppressedTraceContext => Option[String]): ConsoleAppender =
     {
-      val appender = new ConsoleAppender(name, out, ansiCodesSupported, useColor, suppressedMessage)
+      val appender = new ConsoleAppender(name, out, ansiCodesSupported, useFormat, suppressedMessage)
       appender.start
       appender
     }
@@ -240,7 +240,7 @@ class ConsoleAppender private[ConsoleAppender] (
   val name: String,
   val out: ConsoleOut,
   val ansiCodesSupported: Boolean,
-  val useColor: Boolean,
+  val useFormat: Boolean,
   val suppressedMessage: SuppressedTraceContext => Option[String]
 ) extends AbstractAppender(name, null, PatternLayout.createDefaultLayout(), true) {
   import scala.Console.{ BLUE, GREEN, RED, RESET, YELLOW }
@@ -294,7 +294,7 @@ class ConsoleAppender private[ConsoleAppender] (
       if (traceLevel >= 0)
         out.print(StackTrace.trimmed(t, traceLevel))
       if (traceLevel <= 2)
-        for (msg <- suppressedMessage(new SuppressedTraceContext(traceLevel, ansiCodesSupported && useColor)))
+        for (msg <- suppressedMessage(new SuppressedTraceContext(traceLevel, ansiCodesSupported && useFormat)))
           printLabeledLine(labelColor(Level.Error), "trace", messageColor(Level.Error), msg)
     }
 
@@ -307,7 +307,7 @@ class ConsoleAppender private[ConsoleAppender] (
   private def reset(): Unit = setColor(RESET)
 
   private def setColor(color: String): Unit = {
-    if (ansiCodesSupported && useColor)
+    if (ansiCodesSupported && useFormat)
       out.lockObject.synchronized { out.print(color) }
   }
   private def appendLog(labelColor: String, label: String, messageColor: String, message: String): Unit =
@@ -330,4 +330,4 @@ class ConsoleAppender private[ConsoleAppender] (
     }
 }
 
-final class SuppressedTraceContext(val traceLevel: Int, val useColor: Boolean)
+final class SuppressedTraceContext(val traceLevel: Int, val useFormat: Boolean)
